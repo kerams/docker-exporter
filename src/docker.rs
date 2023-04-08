@@ -98,7 +98,6 @@ mod contract {
 
     #[derive(Deserialize)]
     pub struct DataUsage {
-        pub LayersSize: u64,
         pub Images: Vec<Image>,
         pub Containers: Vec<Container>,
         pub Volumes: Vec<Volume>
@@ -129,7 +128,7 @@ static CLIENT: Lazy<Client<UnixConnector, Body>> = Lazy::new(|| { Client::unix()
 
 async fn get<T: serde::de::DeserializeOwned>(endpoint: &str) -> Option<T> {
     select! {
-        () = time::sleep(Duration::from_secs(10)) => {
+        () = time::sleep(Duration::from_secs(15)) => {
             error!("{} timed out.", endpoint);
             None
         }
@@ -143,18 +142,18 @@ async fn get<T: serde::de::DeserializeOwned>(endpoint: &str) -> Option<T> {
                             if status.is_success() {
                                 Some(serde_json::from_slice::<T>(&body).unwrap())
                             } else {
-                                error!("HTTP {} - {}", status, String::from_utf8(body.to_vec()).unwrap());
+                                error!("{} HTTP {} - {}", endpoint, status, String::from_utf8(body.to_vec()).unwrap());
                                 None
                             }
                         }
                         Err(e) => {
-                            error!("{}", e);
+                            error!("{} {}", endpoint, e);
                             None
                         }
                     }
                 }
                 Err(e) => {
-                    error!("{}", e);
+                    error!("{} {}", endpoint, e);
                     None
                 }
             }

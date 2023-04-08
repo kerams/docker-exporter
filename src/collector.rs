@@ -1,5 +1,5 @@
-pub use log::debug;
-use prometheus::{Gauge, register_gauge, Histogram, exponential_buckets, register_histogram};
+use log::debug;
+use prometheus::{Counter, Gauge, register_gauge, Histogram, exponential_buckets, register_histogram, register_counter};
 use crate::docker;
 use crate::Config;
 
@@ -185,6 +185,7 @@ use trackers::*;
 pub struct Collector {
     container_count: Gauge,
     probe_duration: Histogram,
+    probe_failures: Counter,
     container_trackers: Vec<ContainerTracker>,
     volume_trackers: Vec<VolumeTracker>,
     image_trackers: Vec<ImageTracker>
@@ -194,11 +195,13 @@ impl Collector {
     pub fn new() -> Collector {
         let buckets = exponential_buckets(1.0, 2.0, 7).unwrap();
         let container_count = register_gauge!("docker_containers", "Number of containers that exist.").unwrap();
-        let probe_duration = register_histogram!("docker_probe_duration_seconds", "How long it takes to query Docker for the complete data set. Includes failed requests.", buckets).unwrap();
+        let probe_duration = register_histogram!("docker_probe_duration_seconds", "How long it takes to query Docker for the complete data set.", buckets).unwrap();
+        let probe_failures = register_counter!("docker_probe_failures_total", "The number of times any individual Docker query failed (because of a timeout or other reasons).").unwrap();
 
         Collector {
             container_count,
             probe_duration,
+            probe_failures,
             container_trackers: Vec::new(),
             volume_trackers: Vec::new(),
             image_trackers: Vec::new()
@@ -230,7 +233,12 @@ impl Collector {
 
                 self.container_count.set(self.container_trackers.len() as f64);
 
-                futures::future::join_all(self.container_trackers.iter().map(|c| c.update())).await;
+                let update_results = futures::future::join_all(self.container_trackers.iter().map(|c| c.update())).await;
+
+                match update_results.iter().filter(|x| x.is_none()).count() {
+                    x if x > 0 => self.probe_failures.inc_by(x as f64),
+                    _ => ()
+                }
 
                 if config.collect_volume_metrics {
                     self.volume_trackers.retain(|v| listed_volumes.iter().any(|v2| v.name == v2.Name));
@@ -263,6 +271,7 @@ impl Collector {
                 true
             }
             _ => {
+                self.probe_failures.inc();
                 false
             }
         }
