@@ -11,6 +11,7 @@ mod trackers {
     pub struct ContainerTracker {
         pub id: String,
         cpu_usage: Gauge,
+        cpu_capacity: Gauge,
         memory_usage: Gauge,
         restart_count: Gauge,
         running_state: Gauge,
@@ -25,6 +26,7 @@ mod trackers {
         pub fn new(c: docker::Container) -> ContainerTracker {
             let name = Self::get_display_name(&c);
             let cpu_usage = register_gauge!(opts!("docker_container_cpu_used_total", "Accumulated CPU usage of a container, in unspecified units, averaged for all logical CPUs usable by the container.", labels! { "name" => &name })).unwrap();
+            let cpu_capacity = register_gauge!(opts!("docker_container_cpu_capacity_total", "All potential CPU usage available to a container, in unspecified units, averaged for all logical CPUs usable by the container. Start point of measurement is undefined - only relative values should be used in analytics.", labels! { "name" => &name })).unwrap();
             let memory_usage = register_gauge!(opts!("docker_container_memory_used_bytes", "Memory usage of a container.", labels! { "name" => &name })).unwrap();
             let restart_count = register_gauge!(opts!("docker_container_restart_count", "Number of times the runtime has restarted this container without explicit user action, since the container was last started.", labels! { "name" => &name })).unwrap();
             let running_state = register_gauge!(opts!("docker_container_running_state", "Whether the container is running (1), restarting (0.5) or stopped (0).", labels! { "name" => &name })).unwrap();
@@ -37,6 +39,7 @@ mod trackers {
             ContainerTracker {
                 id: c.Id,
                 cpu_usage,
+                cpu_capacity,
                 memory_usage,
                 restart_count,
                 running_state,
@@ -75,6 +78,7 @@ mod trackers {
 
             let stats = docker::get_container_stats(&self.id).await?;
             self.cpu_usage.set(stats.cpu_stats.cpu_usage.total_usage as f64);
+            self.cpu_capacity.set(stats.cpu_stats.system_cpu_usage as f64);
             
             let tmp = stats.memory_stats.stats
                 .get("total_inactive_file").copied()

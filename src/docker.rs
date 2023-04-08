@@ -39,7 +39,8 @@ mod contract {
 
     #[derive(Deserialize)]
     pub struct CpuStats {
-        pub cpu_usage: CpuUsage
+        pub cpu_usage: CpuUsage,
+        pub system_cpu_usage: u64
     }
 
     #[derive(Deserialize)]
