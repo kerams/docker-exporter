@@ -78,6 +78,7 @@ mod contract {
 
     #[derive(Deserialize)]
     pub struct Image {
+        pub Id: String,
         pub Containers: u32,
         pub RepoTags: Vec<String>,
         pub Size: u64
