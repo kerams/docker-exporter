@@ -126,8 +126,6 @@ Unix socket only. Requires that the minimum supported API version of your Docker
 
 ### Overall
 
-- `docker_containers` - The number of containers that exist.
-
 - `docker_probe_duration_seconds_bucket` - A histogram of how long it takes to query Docker for the complete data set.
 
 - `docker_probe_failures_total` - The number of times any individual Docker query failed (because of a timeout or other reasons).

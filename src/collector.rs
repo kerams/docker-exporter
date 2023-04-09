@@ -8,6 +8,14 @@ mod trackers {
     use prometheus::{opts, labels, Gauge, register_gauge};
     use crate::docker;
 
+    macro_rules! unregister {
+        ($($COLLECTOR: expr),+) => {{
+            $(
+                prometheus::unregister(Box::new($COLLECTOR.clone())).unwrap_or(());
+            )+
+        }};
+    }
+
     pub struct ContainerTracker {
         pub id: String,
         cpu_usage: Gauge,
@@ -100,15 +108,8 @@ mod trackers {
     impl Drop for ContainerTracker {
         fn drop(&mut self) {
             debug!("Dropping container tracker {}", self.id);
-            prometheus::unregister(Box::new(self.cpu_usage.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.memory_usage.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.restart_count.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.running_state.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.start_time.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.total_bytes_in.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.total_bytes_out.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.total_bytes_read.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.total_bytes_written.clone())).unwrap_or(());
+            unregister!(self.cpu_usage, self.cpu_capacity, self.memory_usage, self.restart_count, self.running_state, self.start_time,
+                self.total_bytes_in, self.total_bytes_out, self.total_bytes_read, self.total_bytes_written);
         }
     }
 
@@ -142,8 +143,7 @@ mod trackers {
     impl Drop for VolumeTracker {
         fn drop(&mut self) {
             debug!("Dropping volume tracker {}", self.name);
-            prometheus::unregister(Box::new(self.size.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.ref_count.clone())).unwrap_or(());
+            unregister!(self.size, self.ref_count);
         }
     }
 
@@ -178,8 +178,7 @@ mod trackers {
     impl Drop for ImageTracker {
         fn drop(&mut self) {
             debug!("Dropping image tracker {}", self.id);
-            prometheus::unregister(Box::new(self.container_count.clone())).unwrap_or(());
-            prometheus::unregister(Box::new(self.size.clone())).unwrap_or(());
+            unregister!(self.size, self.container_count);
         }
     }
 }
@@ -187,7 +186,6 @@ mod trackers {
 use trackers::*;
 
 pub struct Collector {
-    container_count: Gauge,
     probe_duration: Histogram,
     probe_failures: Counter,
     container_trackers: Vec<ContainerTracker>,
@@ -198,12 +196,10 @@ pub struct Collector {
 impl Collector {
     pub fn new() -> Collector {
         let buckets = exponential_buckets(1.0, 2.0, 7).unwrap();
-        let container_count = register_gauge!("docker_containers", "Number of containers that exist.").unwrap();
         let probe_duration = register_histogram!("docker_probe_duration_seconds", "How long it takes to query Docker for the complete data set.", buckets).unwrap();
         let probe_failures = register_counter!("docker_probe_failures_total", "The number of times any individual Docker query failed (because of a timeout or other reasons).").unwrap();
 
         Collector {
-            container_count,
             probe_duration,
             probe_failures,
             container_trackers: Vec::new(),
@@ -234,8 +230,6 @@ impl Collector {
                         self.container_trackers.push(ContainerTracker::new(c));
                     }
                 }
-
-                self.container_count.set(self.container_trackers.len() as f64);
 
                 let update_results = futures::future::join_all(self.container_trackers.iter().map(|c| c.update())).await;
 
