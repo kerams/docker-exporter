@@ -7,8 +7,6 @@ IMAGE_NAME="keramss/$GIT_REPO:$BUILD_TIME"
 
 cargo b -r --target x86_64-unknown-linux-musl
 cargo b -r --target aarch64-unknown-linux-musl
-#upx target/x86_64-unknown-linux-musl/release/docker-exporter
-#upx target/aarch64-unknown-linux-musl/release/docker-exporter
 
 docker build -t $IMAGE_NAME-amd64 --build-arg DIR=target/x86_64-unknown-linux-musl/release --platform linux/amd64 --label GIT_COMMIT=$GIT_COMMIT .
 docker build -t $IMAGE_NAME-arm64 --build-arg DIR=target/aarch64-unknown-linux-musl/release --platform linux/arm64 --label GIT_COMMIT=$GIT_COMMIT .
