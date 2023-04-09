@@ -2,7 +2,7 @@
 
  [![](https://img.shields.io/docker/image-size/keramss/docker-exporter)](https://hub.docker.com/r/keramss/docker-exporter)
 
-Minimal Prometheus exporter for Docker, <1MB compressed image size, <2MB memory footprint. Collects container metrics and optionally also images and volumes.
+Minimal [Prometheus](https://github.com/prometheus/prometheus) exporter for Docker, <1MB compressed image size, <2MB memory footprint. Collects container metrics and optionally also images and volumes.
 
 ## Supported platforms
 
