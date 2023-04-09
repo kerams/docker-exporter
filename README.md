@@ -29,7 +29,7 @@ version: '3.7'
       environment:
         # VERBOSE: 'true'
         # COLLECT_VOLUME_METRICS: 'true'
-        # COLLECT_VOLUME_METRICS: 'true'
+        # COLLECT_IMAGE_METRICS: 'true'
       ports:
         - "9417:9417"
       volumes:
