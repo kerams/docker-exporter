@@ -1,9 +1,10 @@
 use log::debug;
-use prometheus::{Counter, Gauge, register_gauge, Histogram, exponential_buckets, register_histogram, register_counter};
+use prometheus::{Counter, Histogram, exponential_buckets, register_histogram, register_counter};
 use crate::docker;
 use crate::Config;
 
 mod trackers {
+    use std::string::ToString;
     use log::debug;
     use prometheus::{opts, labels, Gauge, register_gauge};
     use crate::docker;
@@ -120,7 +121,7 @@ mod trackers {
     }
 
     impl VolumeTracker {
-        pub fn new(v: docker::Volume) -> VolumeTracker {
+        pub fn new(v: &docker::Volume) -> VolumeTracker {
             let size = register_gauge!(opts!("docker_volume_size", "Size of a volume in bytes.", labels! { "name" => &v.Name })).unwrap();
             let ref_count = register_gauge!(opts!("docker_volume_container_count", "The number of containers using a volume.", labels! { "name" => &v.Name })).unwrap();
             
@@ -130,7 +131,7 @@ mod trackers {
                 ref_count
             };
 
-            Self::update(&s, &v);
+            Self::update(&s, v);
             s
         }
 
@@ -154,8 +155,8 @@ mod trackers {
     }
 
     impl ImageTracker {
-        pub fn new(i: docker::Image) -> ImageTracker {
-            let tag = i.RepoTags.first().map(|x| x.to_string()).unwrap_or_else(|| i.Id.trim_start_matches("sha256:").to_string());
+        pub fn new(i: &docker::Image) -> ImageTracker {
+            let tag = i.RepoTags.first().map_or_else(|| i.Id.trim_start_matches("sha256:").to_string(), ToString::to_string);
             let container_count = register_gauge!(opts!("docker_image_container_count", "The number of containers based on an image.", labels! { "tag" => &tag })).unwrap();
             let size = register_gauge!(opts!("docker_image_size", "The size of on an image in bytes.", labels! { "tag" => &tag })).unwrap();
 
@@ -165,7 +166,7 @@ mod trackers {
                 size
             };
 
-            Self::update(&s, &i);
+            Self::update(&s, i);
             s
         }
 
@@ -231,7 +232,7 @@ impl Collector {
                     }
                 }
 
-                let update_results = futures::future::join_all(self.container_trackers.iter().map(|c| c.update())).await;
+                let update_results = futures::future::join_all(self.container_trackers.iter().map(trackers::ContainerTracker::update)).await;
 
                 match update_results.iter().filter(|x| x.is_none()).count() {
                     x if x > 0 => self.probe_failures.inc_by(x as f64),
@@ -246,7 +247,7 @@ impl Collector {
                             Some(p) => p.update(&v),
                             _ => {
                                 debug!("Adding volume tracker {}", v.Name);
-                                self.volume_trackers.push(VolumeTracker::new(v));
+                                self.volume_trackers.push(VolumeTracker::new(&v));
                             }
                         }
                     }
@@ -260,7 +261,7 @@ impl Collector {
                             Some(p) => p.update(&i),
                             _ => {
                                 debug!("Adding image tracker {}", i.Id);
-                                self.image_trackers.push(ImageTracker::new(i));
+                                self.image_trackers.push(ImageTracker::new(&i));
                             }
                         }
                     }

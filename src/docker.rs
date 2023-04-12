@@ -56,15 +56,10 @@ mod contract {
     }
 
     #[derive(Deserialize)]
+    #[derive(Default)]
     pub struct BlkioStats {
         #[serde(deserialize_with = "deserialize_null_default", default)]
         pub io_service_bytes_recursive: Vec<BlkioServiceBytesStat>
-    }
-
-    impl Default for BlkioStats {
-        fn default() -> Self {
-            Self { io_service_bytes_recursive: Vec::new() }
-        }
     }
 
     #[derive(Deserialize)]
