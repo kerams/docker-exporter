@@ -32,7 +32,7 @@ mod contract {
         pub usage: u64
     }
 
-    #[derive(Deserialize)]
+    #[derive(Default, Deserialize)]
     pub struct CpuUsage {
         pub total_usage: u64
     }
@@ -40,6 +40,7 @@ mod contract {
     #[derive(Deserialize)]
     pub struct CpuStats {
         pub cpu_usage: CpuUsage,
+        #[serde(default)]
         pub system_cpu_usage: u64
     }
 
@@ -55,8 +56,7 @@ mod contract {
         pub value: u64
     }
 
-    #[derive(Deserialize)]
-    #[derive(Default)]
+    #[derive(Default, Deserialize)]
     pub struct BlkioStats {
         #[serde(deserialize_with = "deserialize_null_default", default)]
         pub io_service_bytes_recursive: Vec<BlkioServiceBytesStat>
@@ -136,7 +136,13 @@ async fn get<T: serde::de::DeserializeOwned>(endpoint: &str) -> Option<T> {
                     match body::to_bytes(res).await {
                         Ok(body) => {
                             if status.is_success() {
-                                Some(serde_json::from_slice::<T>(&body).unwrap())
+                                match serde_json::from_slice::<T>(&body) {
+                                    Ok(res) => Some(res),
+                                    Err(e) => {
+                                        error!("{} deserialization error {} - {}", endpoint, e, String::from_utf8(body.to_vec()).unwrap());
+                                        None
+                                    }
+                                }
                             } else {
                                 error!("{} HTTP {} - {}", endpoint, status, String::from_utf8(body.to_vec()).unwrap());
                                 None

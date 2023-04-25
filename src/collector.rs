@@ -210,8 +210,6 @@ impl Collector {
     }
 
     pub async fn update(&mut self, config: &Config) -> bool {
-        debug!("Probing Docker.");
-
         let _timer = self.probe_duration.start_timer();
 
         let res = if config.collect_image_metrics || config.collect_volume_metrics {
@@ -223,15 +221,16 @@ impl Collector {
 
         match res {
             Some((listed_containers, listed_volumes, listed_images)) => {
-                self.container_trackers.retain(|c| listed_containers.iter().any(|c2| c.id == c2.Id));
+                self.container_trackers.retain(|tracker| listed_containers.iter().any(|c| tracker.id == c.Id));
 
                 for c in listed_containers {
-                    if !self.container_trackers.iter().any(|p| p.id == c.Id) {
+                    if !self.container_trackers.iter().any(|tracker| tracker.id == c.Id) {
                         debug!("Adding container tracker {}", c.Id);
                         self.container_trackers.push(ContainerTracker::new(c));
                     }
                 }
 
+                // Containers that are removed after the list call, but before the update below, are cleaned up next time
                 let update_results = futures::future::join_all(self.container_trackers.iter().map(trackers::ContainerTracker::update)).await;
 
                 match update_results.iter().filter(|x| x.is_none()).count() {
@@ -240,10 +239,10 @@ impl Collector {
                 }
 
                 if config.collect_volume_metrics {
-                    self.volume_trackers.retain(|v| listed_volumes.iter().any(|v2| v.name == v2.Name));
+                    self.volume_trackers.retain(|tracker| listed_volumes.iter().any(|v| tracker.name == v.Name));
 
                     for v in listed_volumes {
-                        match self.volume_trackers.iter().find(|p| p.name == v.Name) {
+                        match self.volume_trackers.iter().find(|tracker| tracker.name == v.Name) {
                             Some(p) => p.update(&v),
                             _ => {
                                 debug!("Adding volume tracker {}", v.Name);
@@ -254,10 +253,10 @@ impl Collector {
                 }
 
                 if config.collect_image_metrics {
-                    self.image_trackers.retain(|i| listed_images.iter().any(|i2| i.id == i2.Id));
+                    self.image_trackers.retain(|tracker| listed_images.iter().any(|i| tracker.id == i.Id));
 
                     for i in listed_images {
-                        match self.image_trackers.iter().find(|p| p.id == i.Id) {
+                        match self.image_trackers.iter().find(|tracker| tracker.id == i.Id) {
                             Some(p) => p.update(&i),
                             _ => {
                                 debug!("Adding image tracker {}", i.Id);
