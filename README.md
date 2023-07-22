@@ -118,11 +118,11 @@ Unix socket only. Requires that the minimum supported API version of your Docker
 
 - `docker_image_container_count` - The number of containers based on an image.
 
-  Labels: tag
+  Labels: tag (may contain image ID if tags are empty or `<none>:<none>`)
 
 - `docker_image_size` - The size of on an image in bytes.
 
-  Labels: tag
+  Labels: tag (may contain image ID if tags are empty or `<none>:<none>`)
 
 ### Overall
 

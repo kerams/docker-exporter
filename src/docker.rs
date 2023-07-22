@@ -76,6 +76,7 @@ mod contract {
     pub struct Image {
         pub Id: String,
         pub Containers: u32,
+        #[serde(deserialize_with = "deserialize_null_default", default)]
         pub RepoTags: Vec<String>,
         pub Size: u64
     }
@@ -96,6 +97,7 @@ mod contract {
     pub struct DataUsage {
         pub Images: Vec<Image>,
         pub Containers: Vec<Container>,
+        #[serde(deserialize_with = "deserialize_null_default", default)]
         pub Volumes: Vec<Volume>
     }
 

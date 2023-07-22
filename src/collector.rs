@@ -156,7 +156,7 @@ mod trackers {
 
     impl ImageTracker {
         pub fn new(i: &docker::Image) -> ImageTracker {
-            let tag = i.RepoTags.first().map_or_else(|| i.Id.trim_start_matches("sha256:").to_string(), ToString::to_string);
+            let tag = i.RepoTags.iter().find(|x| !x.contains("<none>")).map_or_else(|| i.Id.to_string(), String::to_string);
             let container_count = register_gauge!(opts!("docker_image_container_count", "The number of containers based on an image.", labels! { "tag" => &tag })).unwrap();
             let size = register_gauge!(opts!("docker_image_size", "The size of on an image in bytes.", labels! { "tag" => &tag })).unwrap();
 
