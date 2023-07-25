@@ -4,7 +4,6 @@ use crate::docker;
 use crate::Config;
 
 mod trackers {
-    use std::string::ToString;
     use log::debug;
     use prometheus::{opts, labels, Gauge, register_gauge};
     use crate::docker;
@@ -34,16 +33,16 @@ mod trackers {
     impl ContainerTracker {
         pub fn new(c: docker::Container) -> ContainerTracker {
             let name = Self::get_display_name(&c);
-            let cpu_usage = register_gauge!(opts!("docker_container_cpu_used_total", "Accumulated CPU usage of a container, in unspecified units, averaged for all logical CPUs usable by the container.", labels! { "name" => &name })).unwrap();
-            let cpu_capacity = register_gauge!(opts!("docker_container_cpu_capacity_total", "All potential CPU usage available to a container, in unspecified units, averaged for all logical CPUs usable by the container. Start point of measurement is undefined - only relative values should be used in analytics.", labels! { "name" => &name })).unwrap();
-            let memory_usage = register_gauge!(opts!("docker_container_memory_used_bytes", "Memory usage of a container.", labels! { "name" => &name })).unwrap();
-            let restart_count = register_gauge!(opts!("docker_container_restart_count", "Number of times the runtime has restarted this container without explicit user action, since the container was last started.", labels! { "name" => &name })).unwrap();
-            let running_state = register_gauge!(opts!("docker_container_running_state", "Whether the container is running (1), restarting (0.5) or stopped (0).", labels! { "name" => &name })).unwrap();
-            let start_time = register_gauge!(opts!("docker_container_start_time_seconds", "Timestamp indicating when the container was started. Does not get reset by automatic restarts.", labels! { "name" => &name })).unwrap();
-            let total_bytes_in = register_gauge!(opts!("docker_container_network_in_bytes", "Total bytes received by the container's network interfaces.", labels! { "name" => &name })).unwrap();
-            let total_bytes_out = register_gauge!(opts!("docker_container_network_out_bytes", "Total bytes sent by the container's network interfaces.", labels! { "name" => &name })).unwrap();
-            let total_bytes_read = register_gauge!(opts!("docker_container_disk_read_bytes", "Total bytes read from disk by a container.", labels! { "name" => &name })).unwrap();
-            let total_bytes_written = register_gauge!(opts!("docker_container_disk_write_bytes", "Total bytes written to disk by a container.", labels! { "name" => &name })).unwrap();
+            let cpu_usage = register_gauge!(opts!("docker_container_cpu_used_total", "Accumulated CPU usage of a container, in unspecified units, averaged for all logical CPUs usable by the container.", labels! { "name" => name })).unwrap();
+            let cpu_capacity = register_gauge!(opts!("docker_container_cpu_capacity_total", "All potential CPU usage available to a container, in unspecified units, averaged for all logical CPUs usable by the container. Start point of measurement is undefined - only relative values should be used in analytics.", labels! { "name" => name })).unwrap();
+            let memory_usage = register_gauge!(opts!("docker_container_memory_used_bytes", "Memory usage of a container.", labels! { "name" => name })).unwrap();
+            let restart_count = register_gauge!(opts!("docker_container_restart_count", "Number of times the runtime has restarted this container without explicit user action, since the container was last started.", labels! { "name" => name })).unwrap();
+            let running_state = register_gauge!(opts!("docker_container_running_state", "Whether the container is running (1), restarting (0.5) or stopped (0).", labels! { "name" => name })).unwrap();
+            let start_time = register_gauge!(opts!("docker_container_start_time_seconds", "Timestamp indicating when the container was started. Does not get reset by automatic restarts.", labels! { "name" => name })).unwrap();
+            let total_bytes_in = register_gauge!(opts!("docker_container_network_in_bytes", "Total bytes received by the container's network interfaces.", labels! { "name" => name })).unwrap();
+            let total_bytes_out = register_gauge!(opts!("docker_container_network_out_bytes", "Total bytes sent by the container's network interfaces.", labels! { "name" => name })).unwrap();
+            let total_bytes_read = register_gauge!(opts!("docker_container_disk_read_bytes", "Total bytes read from disk by a container.", labels! { "name" => name })).unwrap();
+            let total_bytes_written = register_gauge!(opts!("docker_container_disk_write_bytes", "Total bytes written to disk by a container.", labels! { "name" => name })).unwrap();
             
             ContainerTracker {
                 id: c.Id,
@@ -60,10 +59,10 @@ mod trackers {
             }
         }
 
-        fn get_display_name(c: &docker::Container) -> String {
+        fn get_display_name(c: &docker::Container) -> &str {
             match c.Names.first() {
-                Some(name) if name.trim().len() > 1 => name.trim_start_matches('/').to_string(),
-                _ => c.Id[..12].to_string()
+                Some(name) if name.trim().len() > 1 => name.trim_start_matches('/'),
+                _ => &c.Id[..12]
             }
         }
 
@@ -121,23 +120,23 @@ mod trackers {
     }
 
     impl VolumeTracker {
-        pub fn new(v: &docker::Volume) -> VolumeTracker {
+        pub fn new(v: docker::Volume) -> VolumeTracker {
             let size = register_gauge!(opts!("docker_volume_size", "Size of a volume in bytes.", labels! { "name" => &v.Name })).unwrap();
             let ref_count = register_gauge!(opts!("docker_volume_container_count", "The number of containers using a volume.", labels! { "name" => &v.Name })).unwrap();
             
             let s = VolumeTracker {  
-                name: v.Name.clone(),
+                name: v.Name,
                 size,
                 ref_count
             };
 
-            Self::update(&s, v);
+            Self::update(&s, v.UsageData);
             s
         }
 
-        pub fn update(&self, v: &docker::Volume) {
-            self.size.set(v.UsageData.Size as f64);
-            self.ref_count.set(v.UsageData.RefCount as f64);
+        pub fn update(&self, v: docker::VolumeUsage) {
+            self.size.set(v.Size as f64);
+            self.ref_count.set(v.RefCount as f64);
         }
     }
 
@@ -155,24 +154,24 @@ mod trackers {
     }
 
     impl ImageTracker {
-        pub fn new(i: &docker::Image) -> ImageTracker {
-            let tag = i.RepoTags.iter().find(|x| !x.contains("<none>")).map_or_else(|| i.Id.to_string(), String::to_string);
-            let container_count = register_gauge!(opts!("docker_image_container_count", "The number of containers based on an image.", labels! { "tag" => &tag })).unwrap();
-            let size = register_gauge!(opts!("docker_image_size", "The size of on an image in bytes.", labels! { "tag" => &tag })).unwrap();
+        pub fn new(i: docker::Image) -> ImageTracker {
+            let tag = i.RepoTags.iter().find(|x| !x.contains("<none>")).unwrap_or(&i.Id);
+            let container_count = register_gauge!(opts!("docker_image_container_count", "The number of containers based on an image.", labels! { "tag" => tag })).unwrap();
+            let size = register_gauge!(opts!("docker_image_size", "The size of on an image in bytes.", labels! { "tag" => tag })).unwrap();
 
             let s = ImageTracker {
-                id: i.Id.clone(),
+                id: i.Id,
                 container_count,
                 size
             };
 
-            Self::update(&s, i);
+            Self::update(&s, i.Containers, i.Size);
             s
         }
 
-        pub fn update(&self, i: &docker::Image) {
-            self.container_count.set(i.Containers as f64);
-            self.size.set(i.Size as f64);
+        pub fn update(&self, container_count: u32, size: u64) {
+            self.container_count.set(container_count as f64);
+            self.size.set(size as f64);
         }
     }
 
@@ -243,10 +242,10 @@ impl Collector {
 
                     for v in listed_volumes {
                         match self.volume_trackers.iter().find(|tracker| tracker.name == v.Name) {
-                            Some(p) => p.update(&v),
+                            Some(p) => p.update(v.UsageData),
                             _ => {
                                 debug!("Adding volume tracker {}", v.Name);
-                                self.volume_trackers.push(VolumeTracker::new(&v));
+                                self.volume_trackers.push(VolumeTracker::new(v));
                             }
                         }
                     }
@@ -257,10 +256,10 @@ impl Collector {
 
                     for i in listed_images {
                         match self.image_trackers.iter().find(|tracker| tracker.id == i.Id) {
-                            Some(p) => p.update(&i),
+                            Some(p) => p.update(i.Containers, i.Size),
                             _ => {
                                 debug!("Adding image tracker {}", i.Id);
-                                self.image_trackers.push(ImageTracker::new(&i));
+                                self.image_trackers.push(ImageTracker::new(i));
                             }
                         }
                     }
