@@ -81,6 +81,7 @@ mod trackers {
             }
 
             if !inspect.State.Running {
+                self.memory_usage.set(0.);
                 return Some(());
             }
 
