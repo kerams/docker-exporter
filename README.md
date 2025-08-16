@@ -24,7 +24,7 @@ To run the exporter, use docker-compose.yml:
 version: '3.7'
   services:
     docker-exporter:
-      image: keramss/docker-exporter:2025-08-16T15-55-36ZZ
+      image: keramss/docker-exporter:2025-08-16T15-55-36Z
       restart: unless-stopped
       environment:
         # VERBOSE: 'true'
@@ -43,7 +43,7 @@ docker run -d \
     --name docker-exporter \
     -p 9417:9417 \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    keramss/docker-exporter:2025-08-16T15-55-36ZZ
+    keramss/docker-exporter:2025-08-16T15-55-36Z
 ```
 
 Finally, add a new job to `prometheus.yml`.
@@ -137,3 +137,4 @@ Unix socket only. Requires that the minimum supported API version of your Docker
 ![](1.png)
 
 ![](2.png)
+
