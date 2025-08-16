@@ -52,7 +52,6 @@ Finally, add a new job to `prometheus.yml`.
 scrape_configs:
   # ...
   - job_name: 'docker'
-    fallback_scrape_protocol: PrometheusText0.0.4
     static_configs:
     - targets: ['your-docker-host:9417']
 ```

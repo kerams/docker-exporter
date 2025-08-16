@@ -1,7 +1,7 @@
 use std::net::{SocketAddrV4, Ipv4Addr};
 use std::env::{self, VarError};
 use simplelog::{SimpleLogger, Config as LogConfig};
-use tiny_http::{Response, Server};
+use tiny_http::{Header, Response, Server};
 use prometheus::{TextEncoder, Encoder};
 use log::{info, LevelFilter};
 
@@ -61,7 +61,8 @@ async fn main() {
             let encoder = TextEncoder::new();
             encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
 
-            req.respond(Response::from_data(buffer)).unwrap_or(());
+            let res = Response::from_data(buffer).with_header(Header::from_bytes("Content-Type", prometheus::TEXT_FORMAT).unwrap());
+            req.respond(res).unwrap_or(());
         } else {
             req.respond(Response::empty(408)).unwrap_or(());
         }
